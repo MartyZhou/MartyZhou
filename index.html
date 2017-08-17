@@ -1,0 +1,337 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <style>
+        #dataTable {
+            display: table;
+            margin: auto;
+        }
+
+        #tableHeader {
+            display: table-header-group;
+        }
+
+        #tableHeader>div {
+            display: table-cell;
+            border: 1px solid #aaaaaa;
+            text-align: center;
+        }
+
+        #tableHeader>div>span {
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        .container {
+            display: table-row;
+        }
+
+        .container>div>span {
+            display: inline-block;
+            padding: 5px 25px;
+        }
+
+        .container>div:nth-child(even) {
+            background-color: whitesmoke;
+        }
+
+        .container>div:nth-child(odd) {
+            background-color: azure;
+        }
+
+        .container>div {
+            display: table-cell;
+            border: 1px solid #aaaaaa;
+        }
+
+        #col1 {
+            background-color: antiquewhite;
+        }
+
+        #col2 {
+            background-color: aliceblue;
+        }
+
+        #col3 {
+            background-color: beige;
+        }
+
+        #col4 {
+            background-color: whitesmoke;
+        }
+
+        #col5 {
+            background-color: aliceblue;
+        }
+    </style>
+    <script>
+        var placeholderColumn;
+        var movingColumn;
+        var movingCells;
+        var dropped;
+
+        function getCells(colId, withClone) {
+            var rowCount = 4;
+            var cellList = [];
+
+            for (var i = 1; i < rowCount + 1; i++) {
+                var rowId = 'row' + i;
+                var row = document.getElementById(rowId);
+
+                var cellId = colId + '_cell' + i;
+                var cell = document.getElementById(cellId);
+
+                if (withClone) {
+                    var placeholderCell = cell.cloneNode(true);
+                    placeholderCell.id = cell.id + '_placeholder';
+
+                    var cellData = { cell: cell, placeholder: placeholderCell, row: row };
+                    cellList.push(cellData);
+                } else {
+                    var cellData = { cell: cell, row: row };
+                    cellList.push(cellData);
+                }
+            }
+
+            return cellList;
+        }
+
+        function dragover(ev) {
+            ev.preventDefault();
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.effectAllowed = "move";
+            ev.dataTransfer.dropEffect = "move";
+
+            ev.dataTransfer.setData("text", ev.target.id);
+            movingCells = getCells(ev.target.id, true);
+            movingColumn = ev.target;
+            placeholderColumn = movingColumn.cloneNode(true);
+
+            window.requestAnimationFrame(function () {
+                movingColumn.style.display = "none";
+
+                placeholderColumn.style.borderStyle = "dotted";
+                placeholderColumn.style.borderColor = "green";
+                placeholderColumn.firstElementChild.style.opacity = "0.1";
+                placeholderColumn.firstElementChild.id = "colPlaceholder";
+
+                for (var i = 0; i < movingCells.length; i++) {
+                    var cell = movingCells[i].cell;
+                    cell.style.display = "none";
+
+                    var placeholderCell = movingCells[i].placeholder;
+                    placeholderCell.style.borderStyle = "dotted";
+                    placeholderCell.style.borderColor = "green";
+                    placeholderCell.firstElementChild.style.opacity = "0.1";
+                    placeholderCell.firstElementChild.id = placeholderCell.id + '_child';
+
+                    var row = movingCells[i].row;
+                    row.insertBefore(placeholderCell, cell);
+                }
+
+                var container = document.getElementById("tableHeader");
+                container.insertBefore(placeholderColumn, movingColumn);
+            });
+        }
+
+        function dragend(ev) {
+            var container = document.getElementById("tableHeader");
+
+            container.insertBefore(ev.target, placeholderColumn);
+
+            window.requestAnimationFrame(function () {
+                ev.target.style.display = "table-cell";
+            });
+
+            if (placeholderColumn) {
+                container.removeChild(placeholderColumn);
+                placeholderColumn = undefined;
+            }
+
+            for (var i = 0; i < movingCells.length; i++) {
+                var cell = movingCells[i].cell;
+                var row = movingCells[i].row;
+                var placeholderCell = movingCells[i].placeholder;
+
+                row.insertBefore(cell, placeholderCell);
+                row.removeChild(placeholderCell);
+
+                cell.style.display = "table-cell";
+            }
+        }
+
+        function dragenter(ev) {
+            if (placeholderColumn && placeholderColumn !== ev.target) {
+                var container = document.getElementById("tableHeader");
+
+                var targetIndex = 0;
+                var placeholderIndex = 0;
+
+                for (var i = 0; i < container.childElementCount; i++) {
+                    if (container.children[i] === ev.target) {
+                        targetIndex = i;
+                        continue;
+                    }
+
+                    if (container.children[i] === placeholderColumn) {
+                        placeholderIndex = i;
+                        continue;
+                    }
+                }
+
+                var targetDiv = ev.target;
+                if (placeholderIndex > targetIndex) { // move forward, from left to right
+                    moveForward(container, targetDiv);
+                } else { // move backward, from right to left
+                    movebackward(container, targetDiv);
+                }
+            }
+        }
+
+        function moveForward(container, sibling) {
+            if (sibling.nextElementSibling) {
+                moveForward(container, sibling.nextElementSibling)
+                if (sibling !== placeholderColumn) {
+                    var siblingCells = getCells(sibling.id, false);
+                    if (movingCells && movingCells.length === siblingCells.length) {
+                        for (var i = 0; i < siblingCells.length; i++) {
+                            var movingCell = movingCells[i];
+                            var row = movingCell.row;
+                            var movingSibling = siblingCells[i].cell;
+                            var placeholderCell = movingCell.placeholder;
+
+                            if (movingSibling !== placeholderCell) {
+                                row.insertBefore(placeholderCell, movingSibling);
+                            }
+                        }
+                    }
+
+                    container.insertBefore(placeholderColumn, sibling);
+                }
+            }
+        }
+
+        function movebackward(container, sibling) {
+            if (sibling.previousElementSibling) {
+                movebackward(container, sibling.previousElementSibling)
+                if (sibling !== placeholderColumn) {
+                    var siblingCells = getCells(sibling.id, false);
+                    if (movingCells && movingCells.length === siblingCells.length) {
+                        for (var i = 0; i < siblingCells.length; i++) {
+                            var movingCell = movingCells[i];
+                            var row = movingCell.row;
+                            var movingSibling = siblingCells[i].cell;
+                            var placeholderCell = movingCell.placeholder;
+
+                            if (movingSibling !== placeholderCell) {
+                                row.insertBefore(movingSibling, placeholderCell);
+                            }
+                        }
+                    }
+
+                    container.insertBefore(sibling, placeholderColumn);
+                }
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <p>Drag Columns</p>
+    <div id="dataTable">
+
+        <div id="tableHeader" ondragover="dragover(event)">
+
+            <div id="col1" ondragover="dragover(event)" ondragstart="drag(event)" draggable="true" ondragend="dragend(event)" ondragenter="dragenter(event)">
+                <span>Type</span>
+            </div>
+            <div id="col2" ondragover="dragover(event)" ondragstart="drag(event)" draggable="true" ondragend="dragend(event)" ondragenter="dragenter(event)">
+                <span>Name</span>
+            </div>
+            <div id="col3" ondragover="dragover(event)" ondragstart="drag(event)" draggable="true" ondragend="dragend(event)" ondragenter="dragenter(event)">
+                <span>Size</span>
+            </div>
+            <div id="col4" ondragover="dragover(event)" ondragstart="drag(event)" draggable="true" ondragend="dragend(event)" ondragenter="dragenter(event)">
+                <span>Modified</span>
+            </div>
+            <div id="col5" ondragover="dragover(event)" ondragstart="drag(event)" draggable="true" ondragend="dragend(event)" ondragenter="dragenter(event)">
+                <span>Author</span>
+            </div>
+
+        </div>
+
+        <div id="row1" class="container" draggable="true">
+            <div id="col1_cell1">
+                <span>Doc</span>
+            </div>
+            <div id="col2_cell1">
+                <span>EU Future</span>
+            </div>
+            <div id="col3_cell1">
+                <span>36 KB</span>
+            </div>
+            <div id="col4_cell1">
+                <span>20 days ago</span>
+            </div>
+            <div id="col5_cell1">
+                <span>Marty</span>
+            </div>
+        </div>
+        <div id="row2" class="container" draggable="true">
+            <div id="col1_cell2">
+                <span>PPTX</span>
+            </div>
+            <div id="col2_cell2">
+                <span>Introduction of Code Standard</span>
+            </div>
+            <div id="col3_cell2">
+                <span>136 KB</span>
+            </div>
+            <div id="col4_cell2">
+                <span>10 days ago</span>
+            </div>
+            <div id="col5_cell2">
+                <span>Zhou</span>
+            </div>
+        </div>
+        <div id="row3" class="container" draggable="true">
+            <div id="col1_cell3">
+                <span>PDF</span>
+            </div>
+            <div id="col2_cell3">
+                <span>Le Brexit</span>
+            </div>
+            <div id="col3_cell3">
+                <span>36 KB</span>
+            </div>
+            <div id="col4_cell3">
+                <span>20 days ago with a very long long long message</span>
+            </div>
+            <div id="col5_cell3">
+                <span>Marty</span>
+            </div>
+        </div>
+        <div id="row4" class="container" draggable="true">
+            <div id="col1_cell4">
+                <span>FORM</span>
+            </div>
+            <div id="col2_cell4">
+                <span>Introduction</span>
+            </div>
+            <div id="col3_cell4">
+                <span>136 KB</span>
+            </div>
+            <div id="col4_cell4">
+                <span>10 days ago</span>
+            </div>
+            <div id="col5_cell4">
+                <span>Zhou</span>
+            </div>
+        </div>
+</body>
+
+</html>
